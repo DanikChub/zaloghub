@@ -11,6 +11,15 @@ async function main() {
     const envPath = resolve('.env');
     // Fail before requesting a login code if the configuration file is missing.
     await readFile(envPath, 'utf8');
+    let networkTimer: NodeJS.Timeout | undefined;
+    const stopNetworkTimer = () => clearTimeout(networkTimer);
+    const startNetworkTimer = () => {
+        stopNetworkTimer();
+        networkTimer = setTimeout(() => {
+            console.error('Telegram не ответил на запрос за 45 секунд. Авторизация остановлена.');
+            process.exit(1);
+        }, 45_000);
+    };
     let muted = false;
     const output = new Writable({
         write(chunk, _encoding, callback) {
@@ -20,6 +29,7 @@ async function main() {
     });
     const prompt = createInterface({ input: process.stdin, output, terminal: true });
     const ask = async (label: string, secret = false) => {
+        stopNetworkTimer();
         process.stdout.write(label);
         muted = secret;
         try {
@@ -29,6 +39,7 @@ async function main() {
         } finally {
             muted = false;
             if (secret) process.stdout.write('\n');
+            startNetworkTimer();
         }
     };
     // A fresh login deliberately ignores a stale TG_SESSION.
@@ -45,7 +56,10 @@ async function main() {
             clearTimeout(watchdog);
         }
         console.log('Соединение с Telegram установлено. Начинаем вход.');
-        await client.start({
+        // This is always a fresh session: skip start()'s preliminary GetState
+        // authorization probe and enter the explicit user login flow directly.
+        startNetworkTimer();
+        await client.signInUser({ apiId: client.apiId, apiHash: client.apiHash }, {
             phoneNumber: () => ask('Телефон в международном формате (+7…): '),
             phoneCode: (viaApp) => ask(viaApp ? 'Код из приложения Telegram: ' : 'Код Telegram: ', true),
             password: () => ask('Пароль двухэтапной аутентификации Telegram: ', true),
@@ -66,6 +80,7 @@ async function main() {
         }
         console.log('Вход выполнен. Новая TG_SESSION сохранена в parser/.env. Запустите npm start.');
     } finally {
+        stopNetworkTimer();
         prompt.close();
         await client.disconnect();
     }
