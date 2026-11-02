@@ -51,7 +51,9 @@ async function main() {
             process.exit(1);
         }, 45_000);
         try {
-            await client.connect();
+            if (!await client.connect() || !client.connected) {
+                throw new Error('Не удалось установить соединение с Telegram через прокси.');
+            }
         } finally {
             clearTimeout(watchdog);
         }

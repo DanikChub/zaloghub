@@ -177,7 +177,9 @@ export async function startParser() {
 
     const client = createTelegramClient(env.tgSession);
     try {
-        await client.connect();
+        if (!await client.connect() || !client.connected) {
+            throw new Error('Не удалось установить соединение с Telegram через прокси.');
+        }
         if (!await client.checkAuthorization()) {
             throw new Error('TG_SESSION недействительна. Выполните npm run auth в папке parser.');
         }

@@ -1,5 +1,5 @@
 import { TelegramClient } from 'telegram';
-import { ConnectionTCPObfuscated } from 'telegram/network/index.js';
+import { TelegramConnection } from './TelegramConnection.js';
 import { StringSession } from 'telegram/sessions/index.js';
 import { env } from '../config/env.js';
 
@@ -22,7 +22,7 @@ export function createTelegramClient(session: string) {
     }
 
     const client = new TelegramClient(telegramSession, env.tgApiId, env.tgApiHash, {
-        connection: ConnectionTCPObfuscated,
+        connection: TelegramConnection,
         useWSS: false,
         connectionRetries: 5,
         floodSleepThreshold: 0,
