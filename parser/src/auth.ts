@@ -34,6 +34,17 @@ async function main() {
     // A fresh login deliberately ignores a stale TG_SESSION.
     const client = createTelegramClient('');
     try {
+        console.log('Подключение к Telegram через MTProto Obfuscated (до 45 секунд)…');
+        const watchdog = setTimeout(() => {
+            console.error('Telegram не ответил за 45 секунд. TCP-доступ через прокси не гарантирует доступность MTProto.');
+            process.exit(1);
+        }, 45_000);
+        try {
+            await client.connect();
+        } finally {
+            clearTimeout(watchdog);
+        }
+        console.log('Соединение с Telegram установлено. Начинаем вход.');
         await client.start({
             phoneNumber: () => ask('Телефон в международном формате (+7…): '),
             phoneCode: (viaApp) => ask(viaApp ? 'Код из приложения Telegram: ' : 'Код Telegram: ', true),
