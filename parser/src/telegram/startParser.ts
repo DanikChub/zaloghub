@@ -1,5 +1,5 @@
 import { TelegramClient } from 'telegram';
-import { StringSession } from 'telegram/sessions/index.js';
+import { createTelegramClient } from './createTelegramClient.js';
 import { NewMessage } from 'telegram/events/index.js';
 import { getSources } from '../integrations/api/getSources.js';
 import {
@@ -171,34 +171,20 @@ async function syncSources(client: TelegramClient) {
 }
 
 export async function startParser() {
-
-    const clientOptions: any = {
-        connectionRetries: 5,
-    };
-
-    if (process.env.TG_PROXY_ENABLED === 'true') {
-        clientOptions.proxy = {
-            ip: process.env.TG_PROXY_HOST!,
-            port: Number(process.env.TG_PROXY_PORT),
-            socksType: 5,
-            username: process.env.TG_PROXY_USERNAME,
-            password: process.env.TG_PROXY_PASSWORD,
-        };
+    if (!env.tgSession.trim()) {
+        throw new Error('TG_SESSION отсутствует. Сначала выполните npm run auth в папке parser.');
     }
 
-    const client = new TelegramClient(
-        new StringSession(env.tgSession),
-        Number(env.tgApiId),
-        env.tgApiHash,
-        clientOptions,
-    );
-
-    await client.start({
-        phoneNumber: async () => '',
-        password: async () => '',
-        phoneCode: async () => '',
-        onError: (err) => console.error(err),
-    });
+    const client = createTelegramClient(env.tgSession);
+    try {
+        await client.connect();
+        if (!await client.checkAuthorization()) {
+            throw new Error('TG_SESSION недействительна. Выполните npm run auth в папке parser.');
+        }
+    } catch (error) {
+        await client.disconnect();
+        throw error;
+    }
 
     console.log('telegram parser started');
 
