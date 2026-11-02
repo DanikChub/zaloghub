@@ -13,13 +13,21 @@ export function createTelegramClient(session: string) {
         throw new Error('Проверьте TG_PROXY_HOST и TG_PROXY_PORT в parser/.env');
     }
 
-    const client = new TelegramClient(new StringSession(session.trim()), env.tgApiId, env.tgApiHash, {
+    const telegramSession = new StringSession(session.trim());
+    if (!session.trim()) {
+        // GramJS defaults to DC 4 on port 80. Use Telegram's TCP port 443
+        // for initial authorization through SOCKS5 (this is not HTTPS/WSS).
+        telegramSession.setDC(4, '149.154.167.91', 443);
+    }
+
+    const client = new TelegramClient(telegramSession, env.tgApiId, env.tgApiHash, {
         connectionRetries: 5,
         floodSleepThreshold: 0,
         proxy: proxyEnabled ? {
             ip: process.env.TG_PROXY_HOST!.trim(),
             port,
             socksType: 5,
+            timeout: 20,
             username: process.env.TG_PROXY_USERNAME || undefined,
             password: process.env.TG_PROXY_PASSWORD || undefined,
         } : undefined,
