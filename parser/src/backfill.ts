@@ -1,5 +1,4 @@
-import { TelegramClient } from 'telegram';
-import { StringSession } from 'telegram/sessions/index.js';
+import { createTelegramClient } from './telegram/createTelegramClient.js';
 import { env } from './config/env.js';
 import { backfillAllSources } from './telegram/backfillAllSources.js';
 import { getSources } from './integrations/api/getSources.js';
@@ -12,36 +11,28 @@ function getArg(name: string): string | null {
 }
 
 async function run() {
-    const clientOptions: any = {
-        connectionRetries: 5,
-    };
-
-    if (process.env.TG_PROXY_ENABLED === 'true') {
-        clientOptions.proxy = {
-            ip: process.env.TG_PROXY_HOST!,
-            port: Number(process.env.TG_PROXY_PORT),
-            socksType: 5,
-            username: process.env.TG_PROXY_USERNAME,
-            password: process.env.TG_PROXY_PASSWORD,
-        };
-    }
-    const client = new TelegramClient(
-        new StringSession(env.tgSession),
-        Number(env.tgApiId),
-        env.tgApiHash,
-        clientOptions,
-    );
-
-    await client.start({
-        phoneNumber: async () => '',
-        password: async () => '',
-        phoneCode: async () => '',
-        onError: (err) => console.error(err),
-    });
-
     const months = Number(getArg('months') ?? '2');
     const sourceIdArg = getArg('sourceId');
     const limit = Number(getArg('limit') ?? '50000');
+    if (!Number.isInteger(months) || months < 1 || !Number.isInteger(limit) || limit < 1) {
+        throw new Error('--months и --limit должны быть положительными целыми числами');
+    }
+    if (sourceIdArg !== null && (!Number.isInteger(Number(sourceIdArg)) || Number(sourceIdArg) < 1)) {
+        throw new Error('--sourceId должен быть положительным внутренним ID источника');
+    }
+    if (!env.tgSession.trim()) {
+        throw new Error('Укажите действующую TG_SESSION в parser/.env');
+    }
+    const client = createTelegramClient(env.tgSession);
+    if (!await client.connect() || !client.connected) {
+        throw new Error('Не удалось подключиться к Telegram');
+    }
+    if (!await client.checkAuthorization()) {
+        throw new Error('TG_SESSION недействительна. Сначала выполните авторизацию.');
+    }
+    // StringSession does not persist channel access hashes. Load subscribed
+    // channels into the entity cache before resolving their numeric IDs.
+    await client.getDialogs({});
 
     const fromDate = new Date();
     fromDate.setMonth(fromDate.getMonth() - months);
