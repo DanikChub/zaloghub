@@ -9,9 +9,20 @@ export function createTelegramClient(session: string) {
     }
 
     const proxyEnabled = process.env.TG_PROXY_ENABLED === 'true';
+    const proxyType = process.env.TG_PROXY_TYPE?.trim().toLowerCase() || 'socks5';
+    const secret = process.env.TG_PROXY_SECRET?.trim() || '';
     const port = Number(process.env.TG_PROXY_PORT);
+    if (proxyEnabled && !['socks5', 'mtproto'].includes(proxyType)) {
+        throw new Error('TG_PROXY_TYPE должен быть socks5 или mtproto');
+    }
     if (proxyEnabled && (!process.env.TG_PROXY_HOST?.trim() || !Number.isInteger(port) || port < 1 || port > 65535)) {
         throw new Error('Проверьте TG_PROXY_HOST и TG_PROXY_PORT в parser/.env');
+    }
+    if (proxyEnabled && proxyType === 'mtproto') {
+        const decoded = Buffer.from(secret, /^[0-9a-f]+$/i.test(secret) ? 'hex' : 'base64');
+        if (decoded.length !== 16 && !(decoded.length === 17 && decoded[0] === 0xdd)) {
+            throw new Error('TG_PROXY_SECRET: нужен обычный MTProto Secret на 16 байт (hex или base64). Fake-TLS secret не поддерживается этой версией GramJS.');
+        }
     }
 
     const telegramSession = new StringSession(session.trim());
@@ -26,14 +37,19 @@ export function createTelegramClient(session: string) {
         useWSS: false,
         connectionRetries: 5,
         floodSleepThreshold: 0,
-        proxy: proxyEnabled ? {
+        proxy: !proxyEnabled ? undefined : proxyType === 'mtproto' ? {
+            ip: process.env.TG_PROXY_HOST!.trim(),
+            port,
+            MTProxy: true,
+            secret,
+        } : {
             ip: process.env.TG_PROXY_HOST!.trim(),
             port,
             socksType: 5,
             timeout: 20,
             username: process.env.TG_PROXY_USERNAME || undefined,
             password: process.env.TG_PROXY_PASSWORD || undefined,
-        } : undefined,
+        },
     });
     client.setLogLevel('error' as Parameters<typeof client.setLogLevel>[0]);
     return client;
