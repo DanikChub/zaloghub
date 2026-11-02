@@ -2,7 +2,7 @@ import { telegramSourceByChannelId } from '../registry/sourceRegistry.js';
 import { RawMessage } from '../types/raw-message.js';
 
 export function buildSourceUrl(raw: RawMessage): string | null {
-    if (raw.sourceKey.startsWith('telegram')) {
+    if (raw.sourceType === 'telegram') {
         const channelId = raw.sourceChannelId;
         const messageId = raw.externalMessageId;
         console.warn('channelId', channelId);

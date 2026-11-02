@@ -12,5 +12,6 @@
     "types": ["node"],
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/core/registry/parserRegistry.ts"]
 }

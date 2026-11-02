@@ -12,6 +12,7 @@ import { env } from '../config/env.js';
 type ActiveSource = {
     source: ParserSourceConfig;
     handler: (event: any) => Promise<void>;
+    eventBuilder: NewMessage;
 };
 
 type BufferedAlbum = {
@@ -117,16 +118,13 @@ async function addSource(client: TelegramClient, source: ParserSourceConfig) {
         await handleLiveMessage(client, event.message, source);
     };
 
-    client.addEventHandler(
-        handler,
-        new NewMessage({
-            chats: [entityRef],
-        }),
-    );
+    const eventBuilder = new NewMessage({ chats: [entityRef] });
+    client.addEventHandler(handler, eventBuilder);
 
     activeSources.set(source.id, {
         source,
         handler,
+        eventBuilder,
     });
 
     console.log('listener added:', {
@@ -141,7 +139,7 @@ function removeSource(client: TelegramClient, sourceId: number) {
     const active = activeSources.get(sourceId);
     if (!active) return;
 
-    client.removeEventHandler(active.handler);
+    client.removeEventHandler(active.handler, active.eventBuilder);
     activeSources.delete(sourceId);
     clearSourceAlbums(sourceId);
 
